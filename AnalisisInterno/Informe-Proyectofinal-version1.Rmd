@@ -1,0 +1,827 @@
+---
+title: "Proyecto final - Turismo Emisivo"
+author: "Fiorella Lúngaro, Patricia Martell, Ana Vignolo"
+date: ''
+output:
+  pdf_document:
+    number_sections: yes
+    extra_dependencies:
+      bbm: null
+      amsthm: null
+      amsmath: null
+      babel: spanish
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include = FALSE}
+
+knitr::opts_chunk$set(echo = TRUE, tidy.opts = list(width.cutoff = 50), tidy = TRUE, fig.pos = 'h', out.extra = '',warning = FALSE,message = FALSE)
+
+```
+
+```{r,echo = FALSE,include = FALSE}
+
+# Cargamos librerías
+library(tidyverse)
+library(readxl)
+library(lubridate)
+library(forcats)
+library(ggplot2)
+library(here)
+
+```
+
+
+
+```{r,echo = FALSE,include = FALSE}
+
+# Cargamos los datos
+emisivo <- read_excel(here("Datos","emisivo.xlsx"))
+
+summary(emisivo)
+names(emisivo)
+
+```
+
+```{r,echo = FALSE,include = FALSE}
+
+# Seleccionamos la variables de interés
+datos <- emisivo %>% 
+  select("Transporte Internacional de Salida", 
+         "FechaSalida","Pais","Motivo","Ocupacion",
+         "Estudio","Destino","Alojamiento","Gente",
+         "Estadia","GastoTotal","GastoAlojamiento",
+         "GastoAlimentacion","GastoTransporteInternac",
+         "GatoTransporteLocal","GastoCultural","GastoTours",
+         "GastoCompras","GastoResto")
+
+names(datos) <- c("Transp_int_salida","Fecha_salida","Pais",
+                  "Motivo","Ocupacion","Estudio","Destino",
+                  "Alojamiento","Gente","Estadia","Gasto_total",
+                  "Gasto_alojamiento","Gasto_alimentacion","Gasto_transp_int",
+                  "Gasto_transp_local","Gasto_cultural","Gasto_tours",
+                  "Gasto_compras","Gasto_resto")
+
+```
+
+```{r,echo = FALSE,include = FALSE}
+
+# Filtramos a los turistas de Uruguay
+datos <- datos %>% 
+  filter(Pais=="Uruguay")
+
+# Filtramos las observaciones con gasto nulo
+summary(datos$Gasto_total)
+
+datos %>% 
+  filter(Gasto_total==0) %>% 
+  nrow()
+
+```
+
+# Introducción
+Estudiaremos un conjunto de variables relevantes del turismo emisivo de uruguay a partir de 2017 para analizar la explicabilidad del Gasto.
+Para este análisis se debe tene en cuenta: 
+
+* Se descartan las variables: FechaEntrada, Transporte Internacional de Ingreso y Trasporte Local  
+* Se descartan las observaciones que: los residentes no son uruguayos, fecha de salida es menor al año 2017 y el Gasto_total es 76.389 ya que lo consideramos valor atípico  
+* Se realiza un supuesto simplificador mediante el cual descartaremos los coeficientes, lo que podría generar un sesgo que debe ser considerado al obtener los resultados y realizar conclusiones  
+* La variable FechaEntrada se utiliza agrupada por Mes - Año  
+
+\textcolor{violet}{Les quedaron dos gráficos al inicio sin título ni comentario. En la intro tienen que poner el objetivo general del trabajo y algún objetivo específico, que base de datos van a trabajar con la referencia a la misma. Enumeran cosas que no van a considerar o criterios sobre los datos sin que sepamos nada de ellos tal vez queda mejor si lo ponen en la ddespcripción de los datos.}
+
+```{r,echo = FALSE,results = "hide",fig.height=3, fig.width=6}
+
+# Graficamos la evolución del gasto medio por concepto
+datos %>% 
+  mutate(salida_anio_mes=round_date(Fecha_salida,"month")) %>% 
+  group_by(salida_anio_mes) %>% 
+  summarise("Alojamiento"=mean(Gasto_alojamiento),
+            "Alimentacion"=mean(Gasto_alimentacion),
+            "Transporte internacional"=mean(Gasto_transp_int),
+            "Transporte local"=mean(Gasto_transp_local),
+            "Cultural"=mean(Gasto_cultural),
+            "Tours"=mean(Gasto_tours),
+            "Compras"=mean(Gasto_compras),
+            "Resto"=mean(Gasto_resto)) %>% 
+  pivot_longer(cols = Alojamiento:Resto,
+               names_to = "tipo",values_to = "gasto_medio") %>% 
+  ggplot() +
+  geom_line(aes(x=salida_anio_mes,y=gasto_medio,color=tipo)) +
+  labs(x="Fecha de salida",
+       y="Gasto medio (en USD corrientes)",
+       color="Concepto")
+
+# Como hay un punto raro, nos quedamos con los datos entre enero de 2017 y marzo de 2020
+min(datos$Fecha_salida)
+max(datos$Fecha_salida)
+
+datos <- datos %>% 
+  filter(year(Fecha_salida)!=2016)
+
+datos %>% 
+  mutate(salida_anio_mes=round_date(Fecha_salida,"month")) %>% 
+  group_by(salida_anio_mes) %>% 
+  summarise("Alojamiento"=mean(Gasto_alojamiento),
+            "Alimentacion"=mean(Gasto_alimentacion),
+            "Transporte internacional"=mean(Gasto_transp_int),
+            "Transporte local"=mean(Gasto_transp_local),
+            "Cultural"=mean(Gasto_cultural),
+            "Tours"=mean(Gasto_tours),
+            "Compras"=mean(Gasto_compras),
+            "Resto"=mean(Gasto_resto)) %>% 
+  pivot_longer(cols = Alojamiento:Resto,
+               names_to = "tipo",values_to = "gasto_medio") %>% 
+  ggplot() +
+  geom_line(aes(x=salida_anio_mes,y=gasto_medio,color=tipo)) +
+  labs(x="Fecha de salida",
+       y="Gasto medio (en USD corrientes)",
+       color="Concepto")
+
+```
+
+
+
+# Descripción de los datos
+
+```{r,echo = FALSE,include = FALSE}
+
+lapply(datos, class)
+
+```
+
+Para la realización del trabajo final de la materia Nuevas Tecnologías para el Análisis Estadístico de Datos, utilizaremos una base de datos relacionada al turismo emisivo publicada por el Ministerio de Turismo. La misma consta de 16295 observaciones y 41 variables de tipo numérica, categórica y de identificación. Para el desarrollo del análisis y aplicación web, haremos una selección de variables que consideramos más relevantes para el interés del proyecto, además de seleccionar solo las observaciones donde el pais de salida es Uruguay. Como se presentará en la sección de exploración de los datos, los gastos en su mayoria estan medidos a partir del año 2017, es por tal motivo que reduciremos la base con las observaciones excluyendo las salidas del 2016.
+
+Las variables seleccionadas para nuestro set de datos son las siguientes:  
+
+* Fecha de salida de uruguay   
+* Variables de tipo de carácter y categóricas, con información relevante como motivo del viaje, destino, alojamiento del viaje, cantidad de integrantes del grupo, cantidad de días en la estadía, ocupación del encuestado y nievel educativo alcanzado.   
+* Variables de tipo numérica referentes al gasto en dólares del viaje. Entre ellas están el gasto total del viaje, junto con una desagración de gasto por alojamiento, gasto en alimentación, gastos en transporte y gasto en compras  
+
+# Preguntas de interés y exploración inicial
+
+El tema de interés del problema que desarrollaremos en el proyecto, tiene como foco realizar un estudio definiendo al gasto como variable dependiente y viendo su impacto en el resto de las variables incluidas en la base de datos. 
+
+Como primer paso, realizaremos un gráfico de caja para visualizar datos anormales y un histograma con el fin de determinar la distribución de la variable gasto total. 
+
+\textcolor{violet}{Faltan título y comentario de las figuras con referencias cruzadas, saquen uno de los boxplots.}
+
+```{r,echo = FALSE,results = "hide",fig.height=3,fig.width=6}
+
+# Revisamos si hay outliers
+datos %>% 
+  ggplot() +
+  geom_boxplot(aes(x=Gasto_total)) +
+  labs(x="Gasto total (en USD corrientes)") +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+
+# Eliminamos el punto más extremo
+datos <- datos %>% 
+  filter(Gasto_total<30000)
+
+# Volvemos a hacer el gráfico de caja (seguimos teniendo muchos datos atípicos)
+datos %>% 
+  ggplot() +
+  geom_boxplot(aes(x=Gasto_total)) +
+  labs(x="Gasto total (en USD corrientes)") +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+
+# Hacemos el histograma
+datos %>% 
+  ggplot( mapping = aes(x = Gasto_total)) +
+  geom_histogram(bins = 30, col = "black", position = 'identity', fill="#a6bddb")  +
+  labs(x="Gasto total (en USD corrientes)", y="Frecuencia de turistas")
+
+```
+
+
+Entre los años 2017 y hasta 2020 podemos notar que el gasto total en turismo emisivo realizado por los turistas se encuentra entre 0 y 25.925, a través del gráfico de caja, notamos que la base tiene una gran cantidad de datos atípicos. Por otro lado, notamos mediante el histograma que la distribución del gasto total de los turista presenta una asimetría a la derecha, concentrandose la mayoría de los datos en gastos menores a 1000 dólares.
+
+\textcolor{violet}{Tendría sentido tener el gasto diaria, el gráfico de gasto total con cantidad de días de estadía no tiene mucha gracia}
+
+
+**Preguntas de interés**  
+
+* ¿Cómo fue la evolución del turismo emisivo de Uruguay entre el 01 de enero de 2017 hasta el 14 de marzo de 2020?  
+* ¿Existe una relación entre el gasto total por los turistas y el motivo del viaje?    
+* ¿Existe una relación entre el gasto total por los turistas y la cantidad de integrantes del grupo o la cantidad de días de estadía?, Y con el nivel educativo alcanzado o el tipo de ocupación?   
+* ¿En relación al gasto total, cuál es el rubro que requiere mayor gasto?   
+
+```{r,echo = FALSE,results = "hide",fig.height=3,fig.width=6}
+
+# Analizamos el gasto total en función de la cantidad de personas
+quantile(datos$Gente,probs = c(0,0.25,0.5,0.75,1))
+
+datos %>% 
+  mutate(tramos_personas=cut(Gente,breaks=c(0,2,4,6,8,15))) %>% 
+  ggplot() +
+  geom_boxplot(aes(x=reorder(tramos_personas,Gasto_total),
+                   y=Gasto_total,
+                   fill=tramos_personas)) +
+  theme(legend.position ="none") +
+  labs(x="Cantidad de personas",
+       y="Gasto total (en USD corrientes)")
+
+```
+
+```{r,echo = FALSE,results = "hide",fig.height=3,fig.width=6}
+
+# Analizamos el gasto total en función de los días de estadía
+quantile(datos$Estadia,probs = c(0,0.25,0.5,0.75,1))
+
+datos %>% 
+  mutate(tramos_estadia=cut(Estadia,
+                             breaks=c(0,quantile(datos$Estadia,probs = c(0,0.25,0.5,0.75,1))))) %>% 
+  ggplot() +
+  geom_boxplot(aes(x=reorder(tramos_estadia,Gasto_total),
+                   y=Gasto_total,
+                   fill=tramos_estadia)) +
+  theme(legend.position ="none") +
+  labs(x="Cantidad de días",
+       y="Gasto total (en USD corrientes)")
+
+```
+
+```{r,echo = FALSE}
+
+# Trabajamos con el gasto total promedio por persona y por día
+datos <- datos %>% 
+  mutate(gasto_persona_diario=Gasto_total/(Estadia*Gente),
+         alojamiento_persona_diario=Gasto_alojamiento/(Estadia*Gente),
+         alimentacion_persona_diario=Gasto_alimentacion/(Estadia*Gente),
+         transint_persona_diario=Gasto_transp_int/(Estadia*Gente),
+         transloc_persona_diario=Gasto_transp_local/(Estadia*Gente),
+         cultural_persona_diario=Gasto_cultural/(Estadia*Gente),
+         tours_persona_diario=Gasto_tours/(Estadia*Gente),
+         compras_persona_diario=Gasto_compras/(Estadia*Gente),
+         resto_persona_diario=Gasto_resto/(Estadia*Gente))
+
+```
+
+```{r, echo = FALSE, fig.height=3, fig.width=6, fig.cap="Los mayores picos en el turismo emisivo de Uruguay se dan en 2017, mientras que entre 2018 y mediados del 2019 se puede observar que la cantidad ed salidas por mes presentan oscilaciones en un rango de 250 a 400 salidas. Por último, vemos que a partir de finales de 2019 el turismo emisivo tiene una decrecimiento fruto de la pandemia COVID 19. "}
+
+# Evolución del turismo emisivo entre enero de 2017 y marzo de 2020
+# Tendríamos que multiplicar las filas por la cantidad de personas?
+datos %>% 
+  count(salida_anio_mes=round_date(Fecha_salida,"month")) %>% 
+  ggplot()+
+  geom_line(aes(x=salida_anio_mes,y=n)) +
+  labs(x="Fecha de salida",
+       y="Cantidad de salidas")
+
+```
+
+```{r,echo = FALSE, fig.height=3, fig.width=6, fig.cap="Visualizando el gasto de cada rubro que tiene la base de datos a partir del 2017, podemos notar que el gasto en lo que mas de destina medido en dólares es en alimentación, lo contrario pasa con el gasto en tours y de otra índole."}
+
+# Graficamos la evolución del gasto medio por concepto por persona y por día
+datos %>% 
+  mutate(salida_anio_mes=round_date(Fecha_salida,"month")) %>% 
+  group_by(salida_anio_mes) %>% 
+  summarise("Alojamiento"=mean(alojamiento_persona_diario),
+            "Alimentacion"=mean(alimentacion_persona_diario),
+            "Transporte internacional"=mean(transint_persona_diario),
+            "Transporte local"=mean(transloc_persona_diario),
+            "Cultural"=mean(cultural_persona_diario),
+            "Tours"=mean(tours_persona_diario),
+            "Compras"=mean(compras_persona_diario),
+            "Resto"=mean(resto_persona_diario)) %>% 
+  pivot_longer(cols = Alojamiento:Resto,
+               names_to = "tipo",values_to = "gasto_medio") %>% 
+  ggplot() +
+  geom_line(aes(x=salida_anio_mes,y=gasto_medio,color=tipo)) +
+  labs(x="Fecha de salida",
+       y="Gasto medio (en USD corrientes)",
+       color="Concepto")
+
+# Como hay un punto raro, nos quedamos con los datos entre enero de 2017 y marzo de 2020
+min(datos$Fecha_salida)
+max(datos$Fecha_salida)
+
+datos <- datos %>% 
+  filter(year(Fecha_salida)!=2016)
+
+datos %>% 
+  mutate(salida_anio_mes=round_date(Fecha_salida,"month")) %>% 
+  group_by(salida_anio_mes) %>% 
+  summarise("Alojamiento"=mean(alojamiento_persona_diario),
+            "Alimentacion"=mean(alimentacion_persona_diario),
+            "Transporte internacional"=mean(transint_persona_diario),
+            "Transporte local"=mean(transloc_persona_diario),
+            "Cultural"=mean(cultural_persona_diario),
+            "Tours"=mean(tours_persona_diario),
+            "Compras"=mean(compras_persona_diario),
+            "Resto"=mean(resto_persona_diario)) %>% 
+  pivot_longer(cols = Alojamiento:Resto,
+               names_to = "tipo",values_to = "gasto_medio") %>% 
+  ggplot() +
+  geom_line(aes(x=salida_anio_mes,y=gasto_medio,color=tipo)) +
+  labs(x="Fecha de salida",
+       y="Gasto medio (en USD corrientes)",
+       color="Concepto")
+
+```
+
+```{r,echo = FALSE,message=FALSE,warning=FALSE,fig.height=3,fig.width=6}
+
+# Deflactamos el gasto medio en dólares corrientes por el IPC de Estados Unidos
+# para obtener el gasto en términos reales
+ipc_usa <- read_csv(here("Datos","IPC_USA.csv"))
+ipc_usa <- ipc_usa %>% 
+  rename("salida_anio_mes"="DATE",
+         "ipc_usa"="CPIAUCNS")
+
+# La inflación de Estados Unidos fue baja entre 2017 y 2020, por lo que los resultados no cambian mucho
+datos %>% 
+  mutate(salida_anio_mes=round_date(Fecha_salida,"month")) %>% 
+  group_by(salida_anio_mes) %>% 
+  summarise("Alojamiento"=mean(alojamiento_persona_diario),
+            "Alimentacion"=mean(alimentacion_persona_diario),
+            "Transporte internacional"=mean(transint_persona_diario),
+            "Transporte local"=mean(transloc_persona_diario),
+            "Cultural"=mean(cultural_persona_diario),
+            "Tours"=mean(tours_persona_diario),
+            "Compras"=mean(compras_persona_diario),
+            "Resto"=mean(resto_persona_diario)) %>% 
+  pivot_longer(cols = Alojamiento:Resto,
+               names_to = "tipo",values_to = "gasto_medio") %>% 
+  left_join(ipc_usa) %>% 
+  mutate(gasto_real=(gasto_medio/ipc_usa)*100) %>% 
+  ggplot() +
+  geom_point(aes(x=gasto_medio,y=gasto_real),alpha=0.5,color="blue") +
+  labs(x="Gasto en dólares corrientes",
+       y="Gasto en dólares reales")
+
+```
+```{r, echo=FALSE}
+
+datos %>% 
+  mutate(salida_anio_mes=round_date(Fecha_salida,"month")) %>% 
+  group_by(salida_anio_mes) %>% 
+  summarise("Alojamiento"=mean(alojamiento_persona_diario),
+            "Alimentacion"=mean(alimentacion_persona_diario),
+            "Transporte internacional"=mean(transint_persona_diario),
+            "Transporte local"=mean(transloc_persona_diario),
+            "Cultural"=mean(cultural_persona_diario),
+            "Tours"=mean(tours_persona_diario),
+            "Compras"=mean(compras_persona_diario),
+            "Resto"=mean(resto_persona_diario)) %>% 
+  pivot_longer(cols = Alojamiento:Resto,
+               names_to = "tipo",values_to = "gasto_medio") %>% 
+  left_join(ipc_usa) %>% 
+  mutate(gasto_real=(gasto_medio/ipc_usa)*100) %>% 
+  ggplot() +
+  geom_line(aes(x=salida_anio_mes,y=gasto_real,color=tipo)) +
+  labs(x="Fecha de salida",
+       y="Gasto medio (en USD real)",
+       color="Concepto")
+
+```
+
+```{r, echo=FALSE}
+
+# Extraemos la tendencia de las series
+desest <- datos %>% 
+  mutate(salida_anio_mes=round_date(Fecha_salida,"month")) %>% 
+  group_by(salida_anio_mes) %>% 
+  summarise("Alojamiento"=mean(alojamiento_persona_diario),
+            "Alimentacion"=mean(alimentacion_persona_diario),
+            "Transporte internacional"=mean(transint_persona_diario),
+            "Transporte local"=mean(transloc_persona_diario),
+            "Cultural"=mean(cultural_persona_diario),
+            "Tours"=mean(tours_persona_diario),
+            "Compras"=mean(compras_persona_diario),
+            "Resto"=mean(resto_persona_diario)) %>% 
+  arrange(salida_anio_mes)
+
+alojamiento <- ts(desest$Alojamiento,start=c(2017,1),end = c(2020,3),frequency = 12)
+alojamiento <- alojamiento %>% 
+  stl("periodic")
+alojamiento <- as.data.frame(alojamiento$time.series)
+alojamiento <- alojamiento %>% 
+  select(trend) %>% 
+  rename("alojamiento_tend"="trend")
+
+alimentacion <- ts(desest$Alimentacion,start=c(2017,1),end = c(2020,3),frequency = 12)
+alimentacion <- alimentacion %>% 
+  stl("periodic")
+alimentacion <- as.data.frame(alimentacion$time.series)
+alimentacion <- alimentacion %>% 
+  select(trend) %>% 
+  rename("alimentacion_tend"="trend")
+
+trans_int <- ts(desest$`Transporte internacional`,start=c(2017,1),end = c(2020,3),frequency = 12)
+trans_int <- trans_int %>% 
+  stl("periodic")
+trans_int <- as.data.frame(trans_int$time.series)
+trans_int <- trans_int %>% 
+  select(trend) %>% 
+  rename("trans_int_tend"="trend")
+
+trans_loc <- ts(desest$`Transporte local`,start=c(2017,1),end = c(2020,3),frequency = 12)
+trans_loc <- trans_loc %>% 
+  stl("periodic")
+trans_loc <- as.data.frame(trans_loc$time.series)
+trans_loc <- trans_loc %>% 
+  select(trend) %>% 
+  rename("trans_loc_tend"="trend")
+
+cultural <- ts(desest$Cultural,start=c(2017,1),end = c(2020,3),frequency = 12)
+cultural <- cultural %>% 
+  stl("periodic")
+cultural <- as.data.frame(cultural$time.series)
+cultural <- cultural %>% 
+  select(trend) %>% 
+  rename("cultural_tend"="trend")
+
+tours <- ts(desest$Tours,start=c(2017,1),end = c(2020,3),frequency = 12)
+tours <- tours %>% 
+  stl("periodic")
+tours <- as.data.frame(tours$time.series)
+tours <- tours %>% 
+  select(trend) %>% 
+  rename("tours_tend"="trend")
+
+compras <- ts(desest$Compras,start=c(2017,1),end = c(2020,3),frequency = 12)
+compras <- compras %>% 
+  stl("periodic")
+compras <- as.data.frame(compras$time.series)
+compras <- compras %>% 
+  select(trend) %>% 
+  rename("compras_tend"="trend")
+
+resto <- ts(desest$Resto,start=c(2017,1),end = c(2020,3),frequency = 12)
+resto <- resto %>% 
+  stl("periodic")
+resto <- as.data.frame(resto$time.series)
+resto <- resto %>% 
+  select(trend) %>% 
+  rename("resto_tend"="trend")
+
+desest <- cbind(desest,alojamiento,alimentacion,trans_int,trans_loc,cultural,tours,compras,resto)
+
+```
+
+```{r, echo=FALSE}
+
+# Graficamos las series con las tendencias
+desest %>%
+  pivot_longer(cols = alojamiento_tend:resto_tend,
+               names_to = "tipo",values_to = "gasto_tend") %>% 
+  mutate(tipo=recode(tipo,"alimentacion_tend"="Alimentación",
+                     "alojamiento_tend"="Alojamiento",
+                     "compras_tend"="Compras",
+                     "cultural_tend"="Cultural",
+                     "resto_tend"="Resto",
+                     "tours_tend"="Tours",
+                     "trans_int_tend"="Transporte internacional",
+                     "trans_loc_tend"="Transporte local")) %>% 
+  ggplot() +
+  geom_line(aes(x=salida_anio_mes,y=gasto_tend,color=tipo)) +
+  labs(x="Fecha de salida",
+       y="Tendencia del gasto medio (en USD corrientes)",
+       color="Concepto")
+
+```
+
+```{r, echo=FALSE}
+
+# Es posible que la caída en el gasto en transporte internacional
+# se deba al aumento de los viajes a Argentina
+datos %>% 
+  mutate(salida_anio_mes=round_date(Fecha_salida,"month")) %>% 
+  group_by(salida_anio_mes,Destino) %>% 
+  summarise(n=n()) %>% 
+  ggplot()+
+  geom_line(aes(x=salida_anio_mes,y=n,group=Destino)) +
+  labs(x="Fecha",
+       y="Cantidad de salidas") +
+  facet_wrap(~Destino)
+
+```
+
+
+```{r,echo = FALSE, results = 'asis'}
+
+library(xtable)
+options(xtable.comment = FALSE)
+
+# Analizamos el gasto por destino recodificado
+datos %>%
+  mutate(Destino_rec=case_when(Destino %in% c("Argentina",
+                                              "Brasil",
+                                              "Chile",
+                                              "Paraguay",
+                                              "Resto Sud America") ~ "América del Sur",
+         Destino == "Africa" ~ "África",
+         Destino %in% c("Asia del Este y Pacifico","Asia Meridional","Oriente Medio") ~ "Asia",
+         Destino == "Centro y Norte America" ~ "Centro y Norteamérica",
+         Destino %in% c("Otros","Sin Datos") ~ "Otros/Sin datos",
+         Destino == "Europa" ~ "Europa")) %>%
+  group_by(Destino) %>% 
+  summarise("Mínimo"=min(gasto_persona_diario),
+            "1er cuartil"=quantile(gasto_persona_diario,probs=0.25),
+            "Mediana"=median(gasto_persona_diario),
+            "Media"=mean(gasto_persona_diario),
+            "3er cuartil"=quantile(gasto_persona_diario,probs=0.75),
+            "Máximo"=max(gasto_persona_diario)) %>% 
+  arrange(desc(Media)) %>% 
+  xtable(caption = "Gasto total en USD corrientes desagregado por país de destino.") %>%
+  print(caption.placement = 'top', include.rownames = FALSE)
+
+```
+
+```{r, echo=FALSE}
+
+# Diagrama de caja: gasto por destino recodificado
+datos %>%
+  mutate(Destino_rec=case_when(Destino %in% c("Argentina",
+                                              "Brasil",
+                                              "Chile",
+                                              "Paraguay",
+                                              "Resto Sud America") ~ "América del Sur",
+         Destino == "Africa" ~ "África",
+         Destino %in% c("Asia del Este y Pacifico","Asia Meridional","Oriente Medio") ~ "Asia",
+         Destino == "Centro y Norte America" ~ "Centro y Norteamérica",
+         Destino %in% c("Otros","Sin Datos") ~ "Otros/Sin datos",
+         Destino == "Europa" ~ "Europa")) %>%
+  ggplot() +
+  geom_boxplot(aes(x=reorder(Destino_rec,gasto_persona_diario),
+                   y=gasto_persona_diario,
+                   fill=Destino_rec)) +
+  labs(x="Destino",
+       y="Gasto total (en USD corrientes)") +
+  theme(legend.position = "none")
+
+
+```
+
+
+```{r,echo = FALSE, results = 'asis'}
+
+# Analizamos el gasto por nivel educativo recodificado
+datos %>%
+  mutate(Estudio_rec=case_when(Estudio == "Primaria incompleta" ~ "Sin primaria",
+                               Estudio %in% c("Primaria completa",
+                                              "Secundaria incompleta") ~ "Primaria",
+                               Estudio %in% c("Secundaria completa",
+                                              "Terciaria incompleta") ~ "Secundaria",
+                               Estudio == "Terciaria completa" ~ "Terciaria",
+                               TRUE ~ "Otros/Sin datos")) %>% 
+  group_by(Estudio) %>% 
+  summarise("Mínimo"=min(gasto_persona_diario),
+            "1er cuartil"=quantile(gasto_persona_diario,probs=0.25),
+            "Mediana"=median(gasto_persona_diario),
+            "Media"=mean(gasto_persona_diario),
+            "3er cuartil"=quantile(gasto_persona_diario,probs=0.75),
+            "Máximo"=max(gasto_persona_diario)) %>% 
+  arrange(desc(Media)) %>% 
+  xtable(caption = "Gasto total en USD corrientes desagregado 
+         por nivel educativo del encuestado.") %>%
+  print(caption.placement = 'top', include.rownames = FALSE)
+
+```
+
+```{r, echo=FALSE}
+
+# Diagrama de caja: gasto por nivel educativo recodificado (máximo nivel educativo completo)
+datos %>%
+  mutate(Estudio_rec=case_when(Estudio == "Primaria incompleta" ~ "Sin primaria",
+                               Estudio %in% c("Primaria completa",
+                                              "Secundaria incompleta") ~ "Primaria",
+                               Estudio %in% c("Secundaria completa",
+                                              "Terciaria incompleta") ~ "Secundaria",
+                               Estudio == "Terciaria completa" ~ "Terciaria",
+                               TRUE ~ "Otros/Sin datos")) %>% 
+  ggplot() +
+  geom_boxplot(aes(x=reorder(Estudio_rec,gasto_persona_diario),
+                   y=gasto_persona_diario,
+                   fill=Estudio_rec)) +
+  labs(x="Máximo nivel educativo completo",
+       y="Gasto total (en USD corrientes)") +
+  theme(legend.position = "none")
+
+```
+
+```{r,echo = FALSE,results = 'asis'}
+
+# Analizamos el gasto por ocupación recodificada
+datos %>%
+  mutate(Ocupacion_rec=
+           case_when(Ocupacion %in% c("Sin datos",
+                                      "Desconocido / Sin Datos") ~ "Sin datos",
+                     Ocupacion == "Desocupado" ~ "Desocupado",
+                     Ocupacion %in% c("Patron, Com, Ind, Prod Agrop",
+                                      "Terciaria incompleta",
+                                       "Director, gerente",
+                                       "Prof, Tecnico, Docente, Artista",
+                                       "Jefe, Capataz, Encargado",
+                                       "Obrero esp, Conductor, Artesano",
+                                       "Empl. Adm, Cajero, Vendedor",
+                                       "Mozo, Portero, Serv Dom, Otros Serv",
+                                       "Trabajador Agro, Pesca",
+                                       "Trabajador sin especializacion",
+                                       "Deportista, Entrenador, Juez Dep",
+                                       "Militar, policia, Aduanero, 
+                                        Insp, bombero, Marinero") ~ "Ocupado",
+                     Ocupacion == c("Religioso",
+                                    "Otros") ~ "Otras",
+                     TRUE ~ "Inactivo")) %>% 
+  group_by(Ocupacion_rec) %>% 
+  summarise("Mínimo"=min(gasto_persona_diario),
+            "1er cuartil"=quantile(gasto_persona_diario,probs=0.25),
+            "Mediana"=median(gasto_persona_diario),
+            "Media"=mean(gasto_persona_diario),
+            "3er cuartil"=quantile(gasto_persona_diario,probs=0.75),
+            "Máximo"=max(gasto_persona_diario)) %>% 
+  arrange(desc(Media)) %>% 
+  xtable(caption = "Gasto total en USD corrientes desagregado por 
+         ocupación del encuestado.") %>%
+  print(caption.placement = 'top', include.rownames = FALSE)
+
+```
+
+```{r, echo=FALSE}
+
+# Diagrama de caja: gasto por ocupación recodificada
+datos %>%
+  mutate(Ocupacion_rec=
+           case_when(Ocupacion %in% c("Sin datos",
+                                      "Desconocido / Sin Datos") ~ "Sin datos",
+                     Ocupacion == "Desocupado" ~ "Desocupado",
+                     Ocupacion %in% c("Patron, Com, Ind, Prod Agrop",
+                                      "Terciaria incompleta",
+                                       "Director, gerente",
+                                       "Prof, Tecnico, Docente, Artista",
+                                       "Jefe, Capataz, Encargado",
+                                       "Obrero esp, Conductor, Artesano",
+                                       "Empl. Adm, Cajero, Vendedor",
+                                       "Mozo, Portero, Serv Dom, Otros Serv",
+                                       "Trabajador Agro, Pesca",
+                                       "Trabajador sin especializacion",
+                                       "Deportista, Entrenador, Juez Dep",
+                                       "Militar, policia, Aduanero, 
+                                        Insp, bombero, Marinero") ~ "Ocupado",
+                     Ocupacion == c("Religioso",
+                                    "Otros") ~ "Otras",
+                     TRUE ~ "Inactivo")) %>% 
+  ggplot() +
+  geom_boxplot(aes(x=reorder(Ocupacion_rec,gasto_persona_diario),
+                   y=gasto_persona_diario,
+                   fill=Ocupacion_rec)) +
+  labs(x="Ocupación",
+       y="Gasto total (en USD corrientes)") +
+  theme(legend.position = "none")
+
+```
+
+```{r,echo = FALSE,results = 'asis'}
+
+# Analizamos el gasto por motivo del viaje recodificado
+datos %>% 
+  mutate(Motivo_rec=case_when(Motivo == "Compras" ~ "Compras",
+                              Motivo == "Deportivo" ~ "Deportes",
+                              Motivo == "Estudios" ~ "Estudios",
+                              Motivo %in% c("Negocios, Profesion",
+                                            "Trabajo remunerado Destino") ~ "Trabajo",
+                              Motivo == "Ocio, Recreo, Vacaciones" ~ "Vacaciones",
+                              Motivo == "Visita familiares / amigos" ~ "Visita",
+                              TRUE ~ "Salud")) %>%
+  group_by(Motivo_rec) %>% 
+  summarise("Mín"=min(gasto_persona_diario),
+            "1er cuartil"=quantile(gasto_persona_diario,probs=0.25),
+            "Mediana"=median(gasto_persona_diario),
+            "Media"=mean(gasto_persona_diario),
+            "3er cuartil"=quantile(gasto_persona_diario,probs=0.75),
+            "Máximo"=max(gasto_persona_diario)) %>% 
+  arrange(desc(Media)) %>% 
+  xtable(caption = "Gasto total en USD corrientes desagregado por 
+         motivo del viaje.") %>%
+  print(caption.placement = 'top', include.rownames = FALSE)
+
+```
+
+```{r, echo=FALSE}
+
+# Diagrama de caja: gasto por motivo recodificado
+datos %>% 
+  mutate(Motivo_rec=case_when(Motivo == "Compras" ~ "Compras",
+                              Motivo == "Deportivo" ~ "Deportes",
+                              Motivo == "Estudios" ~ "Estudios",
+                              Motivo %in% c("Negocios, Profesion",
+                                            "Trabajo remunerado Destino") ~ "Trabajo",
+                              Motivo == "Ocio, Recreo, Vacaciones" ~ "Vacaciones",
+                              Motivo == "Tratamiento Salud" ~ "Salud",
+                              Motivo == "Visita familiares / amigos" ~ "Visita",
+                              TRUE ~ "Otros")) %>%
+  ggplot() +
+  geom_boxplot(aes(x=reorder(Motivo_rec,gasto_persona_diario),
+                   y=gasto_persona_diario,
+                   fill=Motivo_rec)) +
+  labs(x="Motivo del viaje",
+       y="Gasto total (en USD corrientes)") +
+  theme(legend.position = "none")
+
+```
+
+```{r,echo = FALSE,results = 'asis'}
+
+# Analizamos el gasto por tipo de alojamiento
+datos %>% 
+  mutate(Alojamiento_rec=case_when(Alojamiento %in% c("Appart Hotel",
+                                                      "Hotel",
+                                                      "Hostel") ~ "Hotel/Hostel",
+                                   Alojamiento == c("Cabañas, Bungalows",
+                                                    "Vivienda Arrendada") ~ "Alquiler",
+                                   Alojamiento == "Vivienda Propia" ~ "Vivienda propia",
+                                   Alojamiento == "Camping" ~ "Camping",
+                                   Alojamiento == "Barco, Yate, Crucero" ~ "Yate/Crucero",
+                                   Alojamiento == "Vivienda Familiares / Amigos" ~ "Familiares/Amigos",
+                                   TRUE ~ "Otros")) %>%
+  group_by(Alojamiento_rec) %>% 
+  summarise("Mínimo"=min(gasto_persona_diario),
+            "1er cuartil"=quantile(gasto_persona_diario,probs=0.25),
+            "Mediana"=median(gasto_persona_diario),
+            "Media"=mean(gasto_persona_diario),
+            "3er cuartil"=quantile(gasto_persona_diario,probs=0.75),
+            "Máximo"=max(gasto_persona_diario)) %>% 
+  arrange(desc(Media)) %>% 
+  xtable(caption = "Gasto total en USD corrientes desagregado por 
+         tipo de alojamiento del encuetado.") %>%
+  print(caption.placement = 'top', include.rownames = FALSE)
+
+```
+
+```{r, echo=FALSE}
+
+# Diagrama de caja: gasto por tipo de alojamiento recodificado
+datos %>% 
+  mutate(Alojamiento_rec=case_when(Alojamiento %in% c("Appart Hotel",
+                                                      "Hotel",
+                                                      "Hostel") ~ "Hotel/Hostel",
+                                   Alojamiento == c("Cabañas, Bungalows",
+                                                    "Vivienda Arrendada") ~ "Alquiler",
+                                   Alojamiento == "Vivienda Propia" ~ "Vivienda propia",
+                                   Alojamiento == "Camping" ~ "Camping",
+                                   Alojamiento == "Barco, Yate, Crucero" ~ "Yate/Crucero",
+                                   Alojamiento == "Vivienda Familiares / Amigos" ~ "Familiares/Amigos",
+                                   TRUE ~ "Otros")) %>%
+  ggplot() +
+  geom_boxplot(aes(x=reorder(Alojamiento_rec,gasto_persona_diario),
+                   y=gasto_persona_diario,
+                   fill=Alojamiento_rec)) +
+  labs(x="Tipo de alojamiento",
+       y="Gasto total (en USD corrientes)") +
+  theme(legend.position = "none")
+
+```
+```{r, echo=FALSE}
+
+# Análisis del gasto por día de la semana
+datos %>% 
+  mutate(dia_salida=weekdays(Fecha_salida)) %>% 
+  mutate(dia_salida=recode(dia_salida, 
+                           "Monday" = "Lunes",
+                           "Tuesday" = "Martes",
+                           "Wednesday" = "Miércoles",
+                           "Thursday" = "Jueves",
+                           "Friday" = "Viernes",
+                           "Saturday" = "Sábado",
+                           "Sunday" = "Domingo")) %>% 
+  group_by(dia_salida) %>% 
+  summarise(gasto_dia=mean(gasto_persona_diario)) %>% 
+  ggplot() +
+  geom_col(aes(x=reorder(dia_salida,gasto_dia),y=gasto_dia,fill=dia_salida)) +
+  theme(legend.position = "none") +
+  labs(x="Día de la semana",
+       y="Gasto promedio (en USD corrientes)")
+
+```
+
+```{r, echo=FALSE}
+
+# Análisis del gasto en compras por día de la semana
+datos %>% 
+  mutate(dia_salida=weekdays(Fecha_salida)) %>% 
+  mutate(dia_salida=recode(dia_salida, 
+                           "Monday" = "Lunes",
+                           "Tuesday" = "Martes",
+                           "Wednesday" = "Miércoles",
+                           "Thursday" = "Jueves",
+                           "Friday" = "Viernes",
+                           "Saturday" = "Sábado",
+                           "Sunday" = "Domingo")) %>% 
+  group_by(dia_salida) %>% 
+  summarise(gasto_dia_compras=mean(compras_persona_diario)) %>% 
+  ggplot() +
+  geom_col(aes(x=reorder(dia_salida,gasto_dia_compras),y=gasto_dia_compras,fill=dia_salida)) +
+  theme(legend.position = "none") +
+  labs(x="Día de la semana",
+       y="Gasto promedio en compras (en USD corrientes)")
+
+```
+
+
+\textcolor{violet}{Me cuentan en clase, porque hay varios gráficos repetidos y muchos sin comentar, supongo que no los van a poner todos. En la app la selección del periodo no está funcionando}

@@ -1,0 +1,13 @@
+name: ShinyApp
+title: ShinyApp
+username:
+account: patriciamartell
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 6586835
+bundleId: 6068062
+url: https://patriciamartell.shinyapps.io/ShinyApp/
+when: 1656940162.9902
+lastSyncTime: 1656940162.9902
+asMultiple: FALSE
+asStatic: FALSE

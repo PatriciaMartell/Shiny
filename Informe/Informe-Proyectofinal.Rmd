@@ -1,0 +1,753 @@
+---
+title: "Proyecto final - Turismo Emisivo"
+author: "Fiorella Lúngaro, Patricia Martell, Ana Vignolo"
+date: 'Julio 2022'
+bibliography: [bibliografia.bib]
+output:
+  pdf_document:
+    toc: true
+    fig_caption: true
+    keep_tex: yes
+    number_sections: yes
+    citation_package: natbib
+    extra_dependencies:
+      bbm: null
+      amsthm: null
+      amsmath: null
+      babel: spanish
+      float: 
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include = FALSE}
+
+knitr::opts_chunk$set(echo = TRUE, tidy.opts = list(width.cutoff = 50), tidy = TRUE, fig.pos = 'H', out.extra = '',warning = FALSE,message = FALSE)
+
+```
+
+```{r,echo = FALSE,include = FALSE}
+
+# Cargamos librerías
+library(tidyverse)
+library(readxl)
+library(lubridate)
+library(forcats)
+library(ggplot2)
+library(here)
+library(patchwork)
+
+```
+
+\nocite{R}
+\nocite{GGplot}
+\nocite{Shiny}
+\nocite{tidyverse}
+\nocite{readxl}
+\nocite{lubridate}
+\nocite{forcats}
+\nocite{ggplot2}
+\nocite{here}
+\nocite{patchwork}
+
+```{r,echo = FALSE,include = FALSE}
+
+# Cargamos los datos
+emisivo <- read_excel(here("Datos","emisivo.xlsx"))
+summary(emisivo)
+names(emisivo)
+
+```
+
+\newpage
+
+# Introducción \label{introduccion}
+
+El presente trabajo se enmarca en la Unidad Curricular Nuevas Tecnologías para el Análisis Estadístico de Datos y tiene por objetivo aplicar las herramientas estudiadas durante el curso. Para ello, se trabajó con la última base de turismo emisivo publicada por el Ministerio de Turismo. Este conjunto de datos se encuentra disponible en el Catálogo de Datos Abiertos del gobierno, y comprende información relativa al turismo en el exterior entre diciembre de 2016 y marzo de 2020.
+
+Para relevar esta información, se encuestó a algunas de las personas que salieron del país por distintos puntos fronterizos durante el período de estudio. Así, se cuenta con $16.295$ observaciones que contienen tanto información relativa a la persona que responde, como relativa a todo el grupo de personas que viaja con la persona encuestada. De esta manera, la base original comprende 41 variables numéricas, categóricas y de identificación.
+
+Es importante destacar que este conjunto de dato no constituye un censo de la totalidad de los turistas sino una encuesta a una muestra aleatoria. Por lo tanto, para obtener estimaciones de totales y medias poblacionales, es necesario expandir la muestra por los ponderadores asignados a cada observación. Sin embargo, dado que este trabajo se centra en la aplicación de las técnicas aprendidas en el curso, se optó por analizar los datos no ponderados. Debe tenerse en cuenta, entonces, que es probable que los resultados obtenidos sean sesgados.
+
+Este documento se estructura como sigue. En la sección \ref{problema}, se presenta el problema de estudio y se plantean los objetivos que orientan el trabajo. En la sección \ref{limpieza}, se detallan las modificaciones realizadas a la estructura de los datos con el fin de facilitar el análisis. Además, se seleccionan las variables apropiadas para resolver el problema definido. En la sección \ref{exploracion}, se estudian las variables de interés tanto en forma univariada como bivariada. Para ello, se hace especial énfasis en el uso de gráficos. En la sección \ref{shiny}, se describe la aplicación web desarrollada, diseñada con el objetivo de que sus usuarios puedan explorar el problema de interés de manera interactiva. Finalmente, en la sección \ref{conclusiones} se resumen los principales hallazgos y se hacen algunos comentarios finales.
+
+# Problema de estudio y objetivos \label{problema}
+
+El principal objetivo de este trabajo es caracterizar el gasto de los turistas uruguayos en el exterior. Se estudia la evolución del promedio mensual del gasto diario por persona. Además, se considera el gasto desagregado por concepto, a saber, gasto en alojamiento, alimentación, transporte internacional y local, actividades culturales, tours y compras.
+
+Si bien se centra el análisis en el gasto expresado en dólares americanos corrientes, también se presentan los resultados en términos reales, de forma de obtener una medida de los bienes y servicios adquiridos fuera del país. Para ello, se deflactó cada serie por el Índice de Precios al Consumo para Consumidores Urbanos de Estados Unidos. Este último indicador fue tomado del banco de datos económicos de la Reserva Federal de Saint Louis (FRED, por su sigla en inglés).
+
+Para facilitar la visualización de posibles cambios en los patrones de cada partida del gasto de los turistas, se extrajo su tendencia. Es decir, se filtró la estacionalidad y el componente irregular de la serie, las cuales pueden dificultar entender su comportamiento de más largo plazo.
+
+Además del análisis univariado de todas estas series, se estudió la posible existencia de asociaciones entre el gasto medio diario por persona y distintas variables como son el país o región de destino, el motivo del viaje, el nivel educativo o la ocupación del encuestado. De esta manera, se trabaja con una variable de respuesta cuantitativa a la que se caracteriza en función de distintas variables categóricas. No obstante, es importante señalar que no se cuenta con elementos para detectar relaciones de causalidad, por lo que solamente se pretende hallar asociaciones entre variables.
+
+A partir de las anteriores consideraciones, se definen los objetivos específicos del trabajo:
+
+* Estudiar la evolución del gasto en turismo de los uruguayos en el exterior y detectar diferencias entre los distintos rubros de gasto.
+* Indagar sobre la existencia de posibles asociaciones entre el gasto y diferentes variables categóricas como, por ejemplo, el destino y el motivo del viaje.
+
+# Limpieza de la base y selección de variables \label{limpieza}
+
+Antes de comenzar el análisis del problema de interés, fue necesario realizar algunas modificaciones al conjunto de datos original.
+
+## Selección de variables \label{seleccion_variables}
+
+En primer lugar, se seleccionaron las variables de interés y se las renombró, eliminando los espacios y los caracteres especiales. En la tabla \ref{tab:variables}, se detallan las variables consideradas. En esta etapa, el hecho de que para algunas de ellas los metadatos no fueran lo suficientemente descriptiva constituyó una dificultad importante. Por ejemplo, en ningún caso se proveyó una lista de códigos para cada variable.
+
+\begin{table}[hbpt]
+	\centering
+	\caption{Variables seleccionadas.} \label{tab:variables}
+	\vspace{0.5cm}
+	\begin{tabular}{lll}
+	\hline
+	\textbf{Variable} & \textbf{Descripción} & \textbf{Tipo} \\
+	\hline
+		Fecha\_salida & Fecha de salida del país & Fecha \\
+		Transp\_int\_salida & Medio de transporte utilizado al egreso & Categórica \\
+		Pais & País de nacionalidad el encuestado & Categórica \\
+		Motivo & Motivo del viaje & Categórica \\
+		Ocupacion & Ocupación o profesión del encuestado & Categórica \\
+		Estudio & Nivel educativo del encuestado & Categórica \\
+		Destino & Región o país al que se viajó & Categórica \\
+		Alojamiento & Tipo de alojamiento utilizado & Categórica \\
+		Gente & Cantidad de integrantes del grupo del encuestado & Numérica \\
+		Estadia & Días de estadía & Numérica \\
+		Gasto\_total & Gasto total en USD corrientes & Numérica \\
+		Gasto\_alojamiento & Gasto en alojamiento en USD corrientes & Numérica \\
+		Gasto\_alimentacion & Gasto en alimentación en USD corrientes & Numérica \\
+		Gasto\_transp\_int & Gasto en transporte internacional en USD corrientes & Numérica \\
+		Gasto\_transp\_local & Gasto en transporte local en USD corrientes & Numérica \\
+		Gasto\_cultural & Gasto cultural en USD corrientes & Numérica \\
+		Gasto\_tours & Gasto en tours en USD corrientes & Numérica \\
+		Gasto\_compras & Gasto en compras en USD corrientes & Numérica \\
+		Gasto\_resto & Otros gastos en USD corrientes & Numérica \\
+	\end{tabular}
+\end{table}
+
+Por otro lado, la variable "Pais" parece haber sido definida incorrectamente en los metadatos. Al diferencia de lo que se explicita en ellos, esta variable no releva el país al que se viajó, sino la nacionalidad del encuestado. Para llegar a esta conclusión, se tomaron en cuenta varios aspectos:
+
+* La variable "Destino" ya recaba el país o región al que viajó el encuestado.
+* En términos generales, para cada variable, se incluye una columna con su código y, a continuación, otra columna con la categoría. En este caso, la variable "Pais" se encuentra inmediatamente después de "IdNacionalidad", por lo que es esperable que ambas contengan la misma información.
+* A cada código de la variable "IdNacionalidad" le corresponde solamente una categoría de la variable "Pais".
+
+```{r,echo = FALSE,include = FALSE}
+
+# Comprobamos que la variable "Pais" corresponde a la nacionalidad del viajero
+# Dado que a cada código le corresponde un único país, confirmamos que ambas variables
+# contienen la misma información
+table(emisivo$IdNacionalidad,emisivo$Pais)
+
+```
+
+En primer lugar, para eliminar información duplicada y facilitar la manipulación de los datos, se quitaron todas las variables con los códigos de cada categoría, como "IdOcupacion", "IdEstudio", etc. Así, se dejaron solamente las variables en las que se explicita cada categoría, como "Ocupacion" y "Estudio".
+
+Dado que este trabajo se centra el análisis en la evolución de las salidas del país, se decidió eliminar todas variables relativas al retorno al país como son la fecha de entrada ("FechaEntrada") y el medio de transporte que se usó para ingresar ("Transporte Internacional de Ingreso").
+
+A su vez, se descartaron los dos juegos de ponderadores brindados, a saber, "Coef" y "CoefTot". Nuevamente, se insiste en el hecho de que, al no considerarlos, probablemente se generen sesgos en las estimaciones de medias y proporciones.
+
+En resumen, se consideraron las siguientes variables del conjunto de datos original:
+
+* Fecha de salida de Uruguay, de forma de poder analizar su evolución a lo largo del tiempo.
+* Variables categóricas vinculadas a las características del encuestado como son la ocupación y el nivel educativo.
+* Variables categóricas con información relativa a la salida del país como es el motivo del viaje, el país o región de destino y el tipo de alojamiento utilizado.
+* Variables numéricas discretas como la duración del viaje (en días) y la cantidad de personas que salieron del país con el encuestado.
+* Variables numéricas referidas al gasto. En particular, se considera el gasto total y desglosado por concepto. Los tipos de gasto identificados son: alojamiento, alimentación, transporte internacional y local, tours y cultural, compras y otros.
+
+```{r, echo = FALSE,include = FALSE}
+
+# Seleccionamos la variables de interés
+datos <- emisivo %>% 
+  select("Transporte Internacional de Salida", 
+         "FechaSalida","Pais","Motivo","IdOcupacion","Ocupacion",
+         "Estudio","Destino","Alojamiento","Gente",
+         "Estadia","GastoTotal","GastoAlojamiento",
+         "GastoAlimentacion","GastoTransporteInternac",
+         "GatoTransporteLocal","GastoCultural","GastoTours",
+         "GastoCompras","GastoResto")
+names(datos) <- c("Transp_int_salida","Fecha_salida","Pais",
+                  "Motivo","IdOcupacion","Ocupacion","Estudio","Destino",
+                  "Alojamiento","Gente","Estadia","Gasto_total",
+                  "Gasto_alojamiento","Gasto_alimentacion","Gasto_transp_int",
+                  "Gasto_transp_local","Gasto_cultural","Gasto_tours",
+                  "Gasto_compras","Gasto_resto")
+# Filtramos a los turistas de Uruguay
+datos <- datos %>% 
+  filter(Pais=="Uruguay")
+```
+
+## Selección de observaciones \label{seleccion_observaciones}
+
+En primer lugar, dado que se desea estudiar el gasto de los uruguayos en el exterior, se debió filtrar a todos los turistas que, si bien salieron de Uruguay, no tienen nacionalidad uruguaya.
+
+En segundo lugar, se optó por no eliminar las respuestas en las que se reporta un gasto total nulo. Como muestran las figuras \ref{fig:gasto_nulo_alojamiento} y \ref{fig:gasto_nulo_motivo}, no se trata de un error sino que, en su mayoría, son personas que fueron a visitar familiares y/o amigos y se alojaron con ellos, por lo que no debieron incurrir en gastos. En otros casos, se trata de personas que viajaron por temas laborales, de estudios, religiosos y de salud. En todos estos casos, es posible que el costo del viaje haya sido pagado por un tercero.
+
+```{r gasto_nulo_alojamiento, echo = FALSE, fig.height=3,fig.width=6, fig.align='center',fig.cap="Cantidad de personas que reportan un gasto total nulo, desagregado por el tipo de alojamiento utilizado. En su mayoría, se trata de personas que se hospedan con familiares o amigos",fig.pos = 'H'}
+
+# Analizamos las observaciones con gasto nulo
+#summary(datos$Gasto_total)
+datos %>% 
+  filter(Gasto_total==0) %>% 
+  mutate(Alojamiento_rec=case_when(Alojamiento %in% c("Appart Hotel",
+                                                      "Hotel",
+                                                      "Hostel") ~ "Hotel/Hostel",
+                                   Alojamiento == c("Cabañas, Bungalows",
+                                                    "Vivienda Arrendada") ~ "Alquiler",
+                                   Alojamiento == "Vivienda Propia" ~ "Vivienda propia",
+                                   Alojamiento == "Camping" ~ "Camping",
+                                   Alojamiento == "Barco, Yate, Crucero" ~ "Yate/Crucero",
+                                   Alojamiento == "Vivienda Familiares / Amigos" ~ "Familiares/Amigos",
+                                   TRUE ~ "Otros")) %>%
+  ggplot() + 
+  geom_bar(aes(x=fct_infreq(Alojamiento_rec)),fill="#a6bddb",col="black") +
+  labs(x="Tipo de alojamiento",
+       y="Frecuencia absoluta")
+
+```
+
+```{r gasto_nulo_motivo,echo=FALSE,fig.height=3,fig.width=6, fig.align='center',fig.cap="Cantidad de personas que reportan un gasto total nulo, desagregado por el motivo del viaje. Suele tratarse de individuos que van a visitar familiares y amigos.",fig.pos = 'H'}
+
+datos %>% 
+  filter(Gasto_total==0) %>% 
+  mutate(Motivo_rec=case_when(Motivo == "Compras" ~ "Compras",
+                              Motivo == "Deportivo" ~ "Deportes",
+                              Motivo == "Estudios" ~ "Estudios",
+                              Motivo %in% c("Negocios, Profesion",
+                                            "Trabajo remunerado Destino") ~ "Trabajo",
+                              Motivo == "Ocio, Recreo, Vacaciones" ~ "Vacaciones",
+                              Motivo == "Visita familiares / amigos" ~ "Visita",
+                              TRUE ~ "Salud")) %>%
+  ggplot() +
+  geom_bar(aes(x=fct_infreq(Motivo_rec)),fill="#a6bddb",col="black") +
+  labs(x="Motivo del viaje",
+       y="Frecuencia absoluta")
+
+```
+Por otra parte, se analizó si existían observaciones atípicas, en términos del gasto total, que pudieran dificultar el análisis. Como primer paso, se construyó un gráfico de caja y un histograma con la distribución del gasto (ver figura \ref{fig:boxplot_gasto}).
+
+```{r boxplot_gasto, fig.height=3,fig.width=6, echo=FALSE, fig.align='center',fig.cap="Gráfico de caja para el gasto total, medido en dólares americanos corrientes. Se aprecian varios valores atípicamente altos.",fig.pos = 'H'}
+
+datos %>% 
+  ggplot() +
+  geom_boxplot(aes(x=Gasto_total)) +
+  labs(x="Gasto total (en USD corrientes)") +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+
+```
+
+Si bien se advierte que existen múltiples valores extremos, claramente hay uno que se aleja muchísimo del resto y que alcanza un gasto total de prácticamente USD 80.000. Dicha observación corresponde a un viaje de 22 días a Europa realizado por un grupo de cuatro personas. Esto equivale a un gasto medio diario per cápita de casi USD 870, extremadamente alto. Por lo tanto, se consideró que efectivamente se trata de un *outlier* y se decidió quitarlo de la base.
+
+```{r, echo=FALSE, results='hide'}
+
+# Analizamos el dato atípico
+datos %>% 
+  filter(Gasto_total>70000) %>% 
+  select(Gasto_total,Estadia,Gente,Destino) %>% 
+  mutate(gasto_diario_persona=Gasto_total/(Estadia*Gente))
+
+```
+
+```{r, echo=FALSE, results='hide'}
+
+# Eliminamos el punto más extremo
+datos <- datos %>% 
+  filter(Gasto_total<30000)
+
+```
+
+```{r, echo=FALSE, results='hide'}
+
+# Volvemos a hacer el gráfico de caja (seguimos teniendo muchos datos atípicos)
+boxplot_sin_outliers <- datos %>% 
+  ggplot() +
+  geom_boxplot(aes(x=Gasto_total)) +
+  labs(x="Gasto total (en USD corrientes)") +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+# Hacemos el histograma
+histograma <- datos %>% 
+  ggplot( mapping = aes(x = Gasto_total)) +
+  geom_histogram(bins = 30, col = "black", position = 'identity', fill="#a6bddb")  +
+  labs(x="Gasto total (en USD corrientes)", y="Frecuencia de turistas")
+
+```
+
+A pesar de esta intevención, como muestra la figura \ref{fig:sin_outliers}, continúa habiendo varios *outliers* en la distribución del gasto. Esto determina que el correspondiente diagrama de caja e histograma exhiban una fuerte asimetría hacia la izquierda. Sin embargo, en este caso, se optó por no removerlas. De lo contrario, podría distorsionarse el análisis y arribarse a resultados incorrectos.
+
+```{r sin_outliers, echo=FALSE,fig.height=3,fig.width=6, fig.align='center',fig.cap="Gráfico de caja e histograma para el gasto total en dólares americanos corrientes, sin el valor atípico más extremo.",fig.pos = 'H'}
+
+boxplot_sin_outliers+histograma
+
+```
+
+## Cálculo del gasto medio diario por persona \label{calculo_gasto}
+
+Antes de explorar los datos para dar respuesta a las interrogantes planteadas en la sección \ref{problema}, fue necesario analizar las características de la variable asociada al gasto total. En los metadatos de la base, no se aclara si esta variable corresponde al gasto por persona o para todo el grupo. Para responder a esta pregunta, se construyeron los diagramas de caja de las figuras \ref{fig:gasto_personas} y \ref{fig:gasto_estadia}.
+
+En la figura \ref{fig:gasto_personas}, se presenta la distribución del gasto total, desagregada por la cantidad de personas que viajaron con el encuestado. Para ello, se agrupó las observaciones en cinco categorías. Se observa que, a medida que aumenta la cantidad de personas en el grupo, también el gasto total tiende a crecer. Por lo tanto, es razonable suponer que esta variable efectivamente mide el gasto de todo el grupo y no sólo del encuestado.
+
+```{r gasto_personas,echo = FALSE,results = "hide",fig.height=3,fig.width=6,fig.align='center',fig.cap="Distribución del gasto total en dólares americanos corrientes en función de la catidad de personas que acompañan al encuestado.",fig.pos = 'H'}
+
+# Analizamos el gasto total en función de la cantidad de personas
+quantile(datos$Gente,probs = c(0.25,0.5,0.75,1))
+datos %>% 
+  mutate(tramos_personas=cut(Gente,breaks=c(0,2,4,6,8,15))) %>% 
+  ggplot() +
+  geom_boxplot(aes(x=reorder(tramos_personas,Gasto_total),
+                   y=Gasto_total,
+                   fill=tramos_personas)) +
+  theme(legend.position ="none") +
+  labs(x="Cantidad de personas",
+       y="Gasto total (en USD corrientes)")
+
+```
+
+Por su parte, para construir el gráfico de la figura \ref{fig:gasto_estadia}, se discretizó la variable con la cantidad de días que duró el viaje en función de sus cuartiles. Nuevamente, un incremento en la cantidad de días se asocia positivamente con el gasto total del viaje. Por lo tanto, también en este caso puede deducirse que se trata de un total para todo el viaje y no por día o alguna otra unidad de medida.
+
+```{r gasto_estadia,echo = FALSE,results = "hide",fig.height=3,fig.width=6,fig.align='center',fig.cap="Distribución del gasto total en dólares americanos corrientes en función de la catidad de días de viaje.",fig.pos = 'H'}
+
+# Analizamos el gasto total en función de los días de estadía
+quantile(datos$Estadia,probs = c(0.25,0.5,0.75,1))
+datos %>% 
+  mutate(tramos_estadia=cut(Estadia,
+                             breaks=c(0,quantile(datos$Estadia,probs = c(0.25,0.5,0.75,1))))) %>% 
+  ggplot() +
+  geom_boxplot(aes(x=reorder(tramos_estadia,Gasto_total),
+                   y=Gasto_total,
+                   fill=tramos_estadia)) +
+  theme(legend.position ="none") +
+  labs(x="Cantidad de días",
+       y="Gasto total (en USD corrientes)")
+
+```
+
+Por lo tanto, para obtener resultados comparables entre encuestados, se creó una variable que midiera el gasto promedio diario por persona registrado en cada observación.
+
+```{r,echo = FALSE}
+
+# Trabajamos con el gasto total promedio por persona y por día
+datos <- datos %>% 
+  mutate(gasto_persona_diario=Gasto_total/(Estadia*Gente),
+         alojamiento_persona_diario=Gasto_alojamiento/(Estadia*Gente),
+         alimentacion_persona_diario=Gasto_alimentacion/(Estadia*Gente),
+         transint_persona_diario=Gasto_transp_int/(Estadia*Gente),
+         transloc_persona_diario=Gasto_transp_local/(Estadia*Gente),
+         cultural_persona_diario=Gasto_cultural/(Estadia*Gente),
+         tours_persona_diario=Gasto_tours/(Estadia*Gente),
+         compras_persona_diario=Gasto_compras/(Estadia*Gente),
+         resto_persona_diario=Gasto_resto/(Estadia*Gente))
+
+```
+ 
+# Análisis exploratorio \label{exploracion}
+
+A continuación, se presentan los resultados del análisis exploratorio realizado con el objetivo de dar respuesta al problema de estudio planteado en la sección \ref{problema}.
+
+## Evolución de la cantidad de encuestados
+
+En primer lugar, se analizó la evolución mensual en la cantidad de encuestados entre enero de 2017 y marzo de 2020, antes del inicio de la pandemia. Como muestra la figura \ref{fig:evolucion}, se observa una variabilidad mes a mes bastante grande. Probablemente, esto se deba a que la serie presenta una estacionalidad que hace que, en ciertos meses del año, haya más salidas de turistas. Este aspecto es tratado más adelante.
+
+De todos modos, se aprecia que en 2017 se alcanzaron los valores máximos del turismo. Posteriormente, se observa una caída muy pronunciada entre el final de 2017 y el inicio del 2018. A su vez, la serie se mantiene estancada durante todo 2018 y crece durante la mayor parte del 2019. Finalmente, a partir de los últimos meses de 2019, se advierte un rápido decrecimiento. Si bien la emergencia sanitaria no queda comprendida en el los datos analizados, durante este período ya varios países del mundo registraban altos niveles de contagio de Covid-19.
+
+```{r evolucion, echo = FALSE, fig.height=3, fig.width=6, fig.cap="Evolución de la cantidad de encuestados entre enero de 2017 y marzo de 2020.",fig.align='center',fig.pos = 'H'}
+
+# Nos interesa trabajar con datos desde 2017
+datos <- datos %>% 
+  filter(year(Fecha_salida)!=2016)
+
+# Evolución del turismo emisivo entre enero de 2017 y marzo de 2020
+datos %>% 
+  count(salida_anio_mes=round_date(Fecha_salida,"month")) %>% 
+  ggplot()+
+  geom_line(aes(x=salida_anio_mes,y=n)) +
+  labs(x="Fecha de salida",
+       y="Cantidad de salidas")
+
+```
+
+## Evolución del gasto corriente
+
+En segundo lugar, se analizó la evolución del gasto medio por día y por persona entre enero de 2017 y marzo de 2020, expresado en dólarees corrientes y desagregado por concepto. Para cada mes, se consideró el promedio en dicha variable para todos los encuestados. Como muestra la figura \ref{fig:evolucion_gasto}, los mayores gastos corresponden al transporte internacional. Esto es razonable, en la medida que incluye pasajes de avión y otros medios de transporte relativamente costosos. Por su parte, también es considerable la proproción del gasto destinada a cubrir el alojamiento y la alimentación.
+
+A su vez, es interesante destacar que el gasto en compras es el rubro que presenta mayor volatilidad. Para algunos meses, llegó a constituir uno de los componentes más importantes (por ejemplo, a mediados de 2018).
+
+El gasto en transporte local y vinculado a actividades culturales presenta una estabilidad mucho mayor. Aunque el gasto en transporte local exhibe un leve aumento durante el período analizado, se mantuvo cercano a los USD 10 corrientes. Por su parte, el gasto en actividades culturales oscila en torno a los USD 5.
+
+Finalmente, se observa que el gasto en tours se mantiene cercano a cero durante todo el período.
+
+```{r evolucion_gasto,echo = FALSE, fig.height=3, fig.width=6, fig.cap="Evolución del gasto medio diario por persona entre enero de 2017 y marzo de 2020, desagregado por concepto.",fig.align='center',results='hide',fig.pos = 'H'}
+
+# Graficamos la evolución del gasto medio por concepto por persona y por día
+datos %>% 
+  mutate(salida_anio_mes=round_date(Fecha_salida,"month")) %>% 
+  group_by(salida_anio_mes) %>% 
+  summarise("Alojamiento"=mean(alojamiento_persona_diario),
+            "Alimentacion"=mean(alimentacion_persona_diario),
+            "Transporte internacional"=mean(transint_persona_diario),
+            "Transporte local"=mean(transloc_persona_diario),
+            "Cultural"=mean(cultural_persona_diario),
+            "Tours"=mean(tours_persona_diario),
+            "Compras"=mean(compras_persona_diario),
+            "Resto"=mean(resto_persona_diario)) %>% 
+  pivot_longer(cols = Alojamiento:Resto,
+               names_to = "tipo",values_to = "gasto_medio") %>% 
+  ggplot() +
+  geom_line(aes(x=salida_anio_mes,y=gasto_medio,color=tipo)) +
+  labs(x="Fecha de salida",
+       y="Gasto medio (en USD corrientes)",
+       color="Concepto")
+
+```
+## Evolución de la tendencia del gasto corriente
+
+Como se analizó en la sección anterior, el gasto medio por día y por persona presenta variaciones mes a mes bastante grandes. Esto dificulta visualizar la trayectoria de cada serie en la medida que no resulta claro el impacto del efecto estacional sobre cada observación.
+
+Para subsanar este problema, se extrajo la tendencia de cada componente del gasto mediante el método de descomposición de Loess (STL, por su sigla en inglés). En la figura \ref{fig:evolucion_desest}, se presentan los resultados.
+
+Se aprecia que la media de los gastos por alojamiento, alimentación, culturales y en tours es aproximadamente constante a lo largo del período. Por su parte, las tendencias del gasto en compras y en transporte local registran un aumento alrededor de 2018.
+
+Sin embargo, lo más llamativo del gráfico es la trayectoria del gasto en transporte internacional. De esta forma, esta serie crece hasta alcanzar un máximo a principios de 2019 y luego cae durante el resto del período. Dado que esta disminución comenzó antes de la pandemia, debe tener su origen en otras causas (al menos inicialmente).
+
+```{r, echo=FALSE}
+
+# Extraemos la tendencia de las series
+desest <- datos %>% 
+  mutate(salida_anio_mes=round_date(Fecha_salida,"month")) %>% 
+  group_by(salida_anio_mes) %>% 
+  summarise("Alojamiento"=mean(alojamiento_persona_diario),
+            "Alimentacion"=mean(alimentacion_persona_diario),
+            "Transporte internacional"=mean(transint_persona_diario),
+            "Transporte local"=mean(transloc_persona_diario),
+            "Cultural"=mean(cultural_persona_diario),
+            "Tours"=mean(tours_persona_diario),
+            "Compras"=mean(compras_persona_diario),
+            "Resto"=mean(resto_persona_diario)) %>% 
+  arrange(salida_anio_mes)
+alojamiento <- ts(desest$Alojamiento,start=c(2017,1),end = c(2020,3),frequency = 12)
+alojamiento <- alojamiento %>% 
+  stl("periodic")
+alojamiento <- as.data.frame(alojamiento$time.series)
+alojamiento <- alojamiento %>% 
+  select(trend) %>% 
+  rename("alojamiento_tend"="trend")
+alimentacion <- ts(desest$Alimentacion,start=c(2017,1),end = c(2020,3),frequency = 12)
+alimentacion <- alimentacion %>% 
+  stl("periodic")
+alimentacion <- as.data.frame(alimentacion$time.series)
+alimentacion <- alimentacion %>% 
+  select(trend) %>% 
+  rename("alimentacion_tend"="trend")
+trans_int <- ts(desest$`Transporte internacional`,start=c(2017,1),end = c(2020,3),frequency = 12)
+trans_int <- trans_int %>% 
+  stl("periodic")
+trans_int <- as.data.frame(trans_int$time.series)
+trans_int <- trans_int %>% 
+  select(trend) %>% 
+  rename("trans_int_tend"="trend")
+trans_loc <- ts(desest$`Transporte local`,start=c(2017,1),end = c(2020,3),frequency = 12)
+trans_loc <- trans_loc %>% 
+  stl("periodic")
+trans_loc <- as.data.frame(trans_loc$time.series)
+trans_loc <- trans_loc %>% 
+  select(trend) %>% 
+  rename("trans_loc_tend"="trend")
+cultural <- ts(desest$Cultural,start=c(2017,1),end = c(2020,3),frequency = 12)
+cultural <- cultural %>% 
+  stl("periodic")
+cultural <- as.data.frame(cultural$time.series)
+cultural <- cultural %>% 
+  select(trend) %>% 
+  rename("cultural_tend"="trend")
+tours <- ts(desest$Tours,start=c(2017,1),end = c(2020,3),frequency = 12)
+tours <- tours %>% 
+  stl("periodic")
+tours <- as.data.frame(tours$time.series)
+tours <- tours %>% 
+  select(trend) %>% 
+  rename("tours_tend"="trend")
+compras <- ts(desest$Compras,start=c(2017,1),end = c(2020,3),frequency = 12)
+compras <- compras %>% 
+  stl("periodic")
+compras <- as.data.frame(compras$time.series)
+compras <- compras %>% 
+  select(trend) %>% 
+  rename("compras_tend"="trend")
+resto <- ts(desest$Resto,start=c(2017,1),end = c(2020,3),frequency = 12)
+resto <- resto %>% 
+  stl("periodic")
+resto <- as.data.frame(resto$time.series)
+resto <- resto %>% 
+  select(trend) %>% 
+  rename("resto_tend"="trend")
+desest <- cbind(desest,alojamiento,alimentacion,trans_int,trans_loc,cultural,tours,compras,resto)
+
+```
+
+```{r evolucion_desest,echo = FALSE,message=FALSE,warning=FALSE,fig.height=3,fig.width=6,fig.cap="Evolución de la tendencia del gasto medio diario por persona entre enero de 2017 y marzo de 2020, desagregado por concepto.",fig.align='center',fig.pos = 'H'}
+
+# Graficamos las series con las tendencias
+desest %>%
+  pivot_longer(cols = alojamiento_tend:resto_tend,
+               names_to = "tipo",values_to = "gasto_tend") %>% 
+  mutate(tipo=recode(tipo,"alimentacion_tend"="Alimentación",
+                     "alojamiento_tend"="Alojamiento",
+                     "compras_tend"="Compras",
+                     "cultural_tend"="Cultural",
+                     "resto_tend"="Resto",
+                     "tours_tend"="Tours",
+                     "trans_int_tend"="Transporte internacional",
+                     "trans_loc_tend"="Transporte local")) %>% 
+  ggplot() +
+  geom_line(aes(x=salida_anio_mes,y=gasto_tend,color=tipo)) +
+  labs(x="Fecha de salida",
+       y="Tendencia del gasto medio (en USD corrientes)",
+       color="Concepto")
+```
+Es interesante notar que el comienzo de la reducción en el gasto en transporte internacional coincide, a grandes rasgos, con el incremento en el transporte local y en compras. Se plantea la hipótesis de que haya existido un aumento en los viajes de compras a destinos cercanos como Argentina. Para indagar en esto, en la figura \ref{fig:lineas_destino} se presenta la evolución en la cantidad de encuestados por destino del viaje.
+
+Como muestra el gráfico, a lo largo de todo el período, la mayor parte de los encuestados viajó a Argentina. Es razonable, entonces, que el gráfico correspondiente a este país en la figura \ref{fig:lineas_destino} exhiba una trayectoria muy similar a la de la figura \ref{fig:evolucion}. En ambos casos, se aprecia una reducción considerable durante el 2018, seguida por una recuperación durante el 2019 y una nueva caída a principios de 2020. Así, es posible que la reducción en el gasto en transporte internacional se haya debido a que los viajes a Argentina son en promedio, más baratos que para otros destinos.
+
+```{r lineas_destino,echo = FALSE,message=FALSE,warning=FALSE,fig.height=3,fig.width=6,fig.cap="Evolución entre enero de 2017 y marzo de 2020 de la cantidad de encuestados por país o región de destino.",fig.align='center',fig.pos = 'H'}
+
+# Es posible que la caída en el gasto en transporte internacional
+# se deba al aumento de los viajes a Argentina
+datos %>% 
+  mutate(salida_anio_mes=round_date(Fecha_salida,"month")) %>% 
+  group_by(salida_anio_mes,Destino) %>% 
+  summarise(n=n()) %>% 
+  ggplot()+
+  geom_line(aes(x=salida_anio_mes,y=n,group=Destino)) +
+  labs(x="Fecha",
+       y="Cantidad de salidas") +
+  facet_wrap(~Destino)
+
+```
+## Evolución del gasto constante
+
+Dado que los datos analizados fueron relevados a lo largo de más de dos años, es interesante estudiar la evolución del gasto en términos reales. Esto permite descontar el efecto de la inflación estadounidense y reflejar mejor la evolución en las decisiones de gasto en dólares de los encuestados.
+
+En la figura \ref{fig:evolucion_constante}, se presenta la evolución en el gasto por rubro, deflactado por el IPC de Estados Unidos. Dado que la inflación en dicho país entre 2017 y 2020 fue baja (alrededor de $2\%$) anual, los resultados no cambian demasiado. De esta manera, más allá de un cambio de escala, las trayectorias de las series resultan ser muy similares.
+
+```{r evolucion_constante,echo = FALSE,message=FALSE,warning=FALSE,fig.height=3,fig.width=6,fig.pos = 'H',fig.align='center',fig.cap="Evolución del gasto medio diario por persona entre enero de 2017 y marzo de 2020, en dólares constantes."}
+
+# Deflactamos el gasto medio en dólares corrientes por el IPC de Estados Unidos
+# para obtener el gasto en términos reales
+ipc_usa <- read_csv(here("Datos","IPC_USA.csv"))
+ipc_usa <- ipc_usa %>% 
+  rename("salida_anio_mes"="DATE",
+         "ipc_usa"="CPIAUCNS")
+
+# La inflación de Estados Unidos fue baja entre 2017 y 2020, por lo que los resultados no cambian mucho
+
+datos %>% 
+  mutate(salida_anio_mes=round_date(Fecha_salida,"month")) %>% 
+  group_by(salida_anio_mes) %>% 
+  summarise("Alojamiento"=mean(alojamiento_persona_diario),
+            "Alimentacion"=mean(alimentacion_persona_diario),
+            "Transporte internacional"=mean(transint_persona_diario),
+            "Transporte local"=mean(transloc_persona_diario),
+            "Cultural"=mean(cultural_persona_diario),
+            "Tours"=mean(tours_persona_diario),
+            "Compras"=mean(compras_persona_diario),
+            "Resto"=mean(resto_persona_diario)) %>% 
+  pivot_longer(cols = Alojamiento:Resto,
+               names_to = "tipo",values_to = "gasto_medio") %>% 
+  left_join(ipc_usa) %>% 
+  mutate(gasto_real=(gasto_medio/ipc_usa)*100) %>% 
+  ggplot() +
+  geom_line(aes(x=salida_anio_mes,y=gasto_real,color=tipo)) +
+  labs(x="Fecha de salida",
+       y="Gasto medio (en USD real)",
+       color="Concepto")
+
+```
+
+## Distribución del gasto por destino
+
+En lo que resta de la sección \ref{exploracion}, se estudia la distribución del gasto en función de distintas variables categóricas. Para facilitar la visualización, se eliminó un dato excepcionalmente alto, de más de USD 4000 por día per cápita.
+
+En primer lugar, se considera el gasto medio diario por persona por país o región de destino. En la figura \ref{fig:boxplot1}, se presentan los correspondientes diagramas de caja.
+
+Los cuartiles más grandes en la distribución del gasto corresponden a Asia. Además, esta región es la que presenta una mayor dispersión de sus datos, lo cual determina que su rango intercuartílico sea el más grande.
+
+Los viajes a América del Norte y Central, América del Sur y Europa registran varios valores inusualmente altos. Así, se observa una asimetría a la izquierda, con un gran porcentaje del gasto concentrado en valores "bajos" del recorrido.
+
+Sin tomar en cuenta los *outliers*, los viajes a Sudamérica resultan ser los menos costosos por persona y por día. Luego, le sigue África, América Central y del Norte, y Europa.
+
+```{r boxplot1,echo = FALSE,message=FALSE,warning=FALSE,fig.height=3,fig.width=6,fig.cap="Diagrama de caja para el gasto medio diario por persona (en dólares corrientes), según país o región de destino.",fig.align='center',fig.pos = 'H'}
+
+# Para mejorar la visualización, se elimina dato atípico
+datos %>%
+  mutate(Destino_rec=case_when(Destino %in% c("Argentina","Brasil", "Chile", "Paraguay", "Resto Sud America") ~ "Sudamérica",
+                           Destino == "Africa" ~ "África",
+                           Destino %in% c("Asia del Este y Pacifico","Asia Meridional","Oriente Medio") ~ "Asia",
+                           Destino == "Centro y Norte America" ~ "Norte y \n Centroamérica",
+                           Destino %in% c("Otros","Sin Datos") ~ "Otros/ \n Sin datos",
+                           Destino == "Europa" ~ "Europa")) %>%
+  filter(gasto_persona_diario < 4000) %>%  
+  ggplot() +
+  geom_boxplot(aes(x=reorder(Destino_rec,gasto_persona_diario),
+                   y=gasto_persona_diario,
+                   fill=Destino_rec)) +
+  labs(x="Destino",  y="Gasto diario por persona (USD corrientes)") +
+  theme(legend.position = "none")
+
+```
+
+## Distribución del gasto por nivel educativo
+
+En segundo lugar, se analizó la distribución del gasto por máximo nivel educativo del encuestado (ver figura \ref{fig:boxplot2}). Si se dejan de lado las observaciones sin datos, se observa que, a mayor nivel educativo, mayor tiende a ser el gasto medio diario por persona. A excepción las personas que no tienen primaria completa, todas las categorías exhiben valores inusuamente grandes. Nuevamente, esto determina que las distribuciones presenten una fuerte asimetría hacia la izquierda.
+
+```{r boxplot2, echo=FALSE,message=FALSE,warning=FALSE,fig.height=3,fig.width=6,fig.cap="Diagrama de caja del gasto diario por persona según el máximo nivel educativo alcanzado por el encuestado.",fig.align='center',fig.pos = 'H'}
+
+datos %>%
+  mutate(Estudio_rec=case_when(Estudio == "Primaria incompleta" ~ "Sin primaria",
+                               Estudio %in% c("Primaria completa",  "Secundaria incompleta") ~ "Primaria",
+                               Estudio %in% c("Secundaria completa", "Terciaria incompleta") ~ "Secundaria",
+                               Estudio == "Terciaria completa" ~ "Terciaria",
+                               TRUE ~ "Otros/Sin datos")) %>% 
+     filter(gasto_persona_diario < 4000) %>%  
+  ggplot() +
+  geom_boxplot(aes(x=reorder(Estudio_rec,gasto_persona_diario),
+                   y=gasto_persona_diario,
+                   fill=Estudio_rec)) +
+  labs(x="Nivel educativo máximo",y="Gasto diario por persona (USD corrientes)") +
+  theme(legend.position = "none")
+
+```
+
+## Distribución del gasto por ocupación
+
+El análisis del gasto por ocupación se muestra en la figura \ref{fig:boxplot3}. Sin tener en cuenta a los individuos para los cuales no se tiene información, se observa que los menores niveles de gasto corresponden a los desocupados, seguidos por los inactivos. Los ocupados presentan los mayores niveles de gasto en términos generales. Además, en esta categoría se concentra la mayor parte de los *outliers*.
+
+En términos generales, los individuos empleados tienden a percibir mayores ingresos que los desocupados y los inactivos (entre los que se encuentran los jubilados), parece razonable que el gasto sea mayor para esta categoría.
+
+```{r boxplot3, echo=FALSE,message=FALSE,warning=FALSE,fig.height=3,fig.width=6,fig.cap="Diagrama de caja del gasto diario por persona según la ocupación del encuestado.",fig.align='center',fig.pos = 'H'}
+
+datos %>%
+  mutate(Ocupacion_rec=case_when(IdOcupacion %in% 1:5 ~ "Inactivo",
+                                 IdOcupacion==8 ~ "Desocupado",
+                                 IdOcupacion %in% 11:21 ~ "Ocupado",
+                                 IdOcupacion %in%  c(0,9) | c(22,99)    ~ "Otros/Sin datos")) %>% 
+     filter(gasto_persona_diario  <4000) %>% 
+  ggplot() +
+  geom_boxplot(aes(x=reorder(Ocupacion_rec,gasto_persona_diario), y=gasto_persona_diario,
+                   fill=Ocupacion_rec)) +
+  labs(x="Ocupación",  y="Gasto diario por persona (USD corrientes)") +
+  theme(legend.position = "none")
+
+```
+
+## Distribución del gasto por motivo del viaje
+
+En la figura \ref{fig:boxplot4}, se presenta la distribución del gasto por motivo del viaje. Los mayores gastos se dan entre quienes realizan viajes de compras, lo cual es esperable.
+
+Por el contrario, las personas que viajan para visitar familiares y/o amigos son las que registran menores niveles de gasto. Como se analizó a través de las figuras \ref{fig:gasto_nulo_alojamiento} y \ref{fig:gasto_nulo_motivo}, en ocasiones estas personas reportan gastos nulos debido a que se hospedan con las personas a las que fueron a ver.
+
+Algo similar ocurre con las personas que viajan por motivos deportivos. En este caso, suele tratarse de individuos que van a participar de partidos, competencias, etc., por lo que sus gastos suelen estar cubiertos por un tercero. Por lo tanto, sus gastos tienden a ser relativamente bajos.
+
+Es llamativo el hecho de que, luego de quienes viajan de compras, los individuos que viajan por razones laborales sean los que exhiben mayores niveles de gasto. *A priori*, no es claro a qué podría deberse esto.
+
+```{r boxplot4, echo=FALSE,message=FALSE,warning=FALSE,fig.height=3,fig.width=6,fig.cap="Diagrama de caja del gasto diario por persona según el motivo del viaje.",fig.align='center',fig.pos = 'H'}
+
+datos %>% 
+  mutate(Motivo_rec=case_when(Motivo == "Compras" ~ "Compras",
+                              Motivo == "Deportivo" ~ "Deportes",
+                              Motivo == "Estudios" ~ "Estudios",
+                              Motivo %in% c("Negocios, Profesion", "Trabajo remunerado Destino") ~ "Trabajo",
+                              Motivo == "Ocio, Recreo, Vacaciones" ~ "Vacaciones",
+                              Motivo == "Tratamiento Salud" ~ "Salud",
+                              Motivo == "Visita familiares / amigos" ~ "Visita",
+                              TRUE ~ "Otros")) %>%
+     filter(gasto_persona_diario  <4000) %>% 
+  ggplot() +
+  geom_boxplot(aes(x=reorder(Motivo_rec,gasto_persona_diario),
+                   y=gasto_persona_diario,
+                   fill=Motivo_rec)) +
+  labs(x="Motivo del viaje",   y="Gasto diario por persona (USD corrientes)") +
+  theme(legend.position = "none")
+
+```
+
+## Distribución del gasto por tipo de alojamiento
+
+Finalmente, se exploró la relación existente entre el tipo de alojamiento utilizado durante el viaje y el gasto medio diario por persona. Los resultados se presentan en la figura \ref{fig:boxplot5}. Los menores niveles de gasto corresponden a quienes se quedan en campings. Como fue dicho, también quienes se alojan con familiares y amigos registran un bajo gasto.
+
+Por otra parte, las personas que alquilan un apartamento o cabaña tienden a gastar menos que los que se quedan en un hotel u hostel. Para esta última categoría, se advierte una gran dispersión en el gasto, con una gran cantidad de *outliers*. Probablemente, esto se deba a la gran variedad de precios de hoteles.
+
+En el extremo superior, la distribución del gasto de quienes se hospedan en yates o cruceros se concentra en niveles altos del recorrido, lo cual parece razonable ya que se trata de un tipo de alojamiento "lujoso".
+
+```{r boxplot5, echo=FALSE,message=FALSE,warning=FALSE,fig.height=3,fig.width=6,fig.cap="Diagrama de caja del gasto diario por persona según el tipo de alojamiento.",fig.align='center',fig.pos = 'H'}
+
+datos %>% 
+  mutate(Alojamiento_rec=case_when(Alojamiento %in% c("Appart Hotel","Hotel", "Hostel") ~ "Hotel/Hostel",
+                                   Alojamiento == c("Cabañas, Bungalows", "Vivienda Arrendada") ~ "Alquiler",
+                                   Alojamiento == "Vivienda Propia" ~ "Vivienda \n propia",
+                                   Alojamiento == "Camping" ~ "Camping",
+                                   Alojamiento == "Barco, Yate, Crucero" ~ "Yate/ \n Crucero",
+                                   Alojamiento == "Vivienda Familiares / Amigos" ~ "Familiares/ \n Amigos",
+                                   TRUE ~ "Otros")) %>%
+     filter(gasto_persona_diario < 4000) %>% 
+  ggplot() +
+  geom_boxplot(aes(x=reorder(Alojamiento_rec,gasto_persona_diario),
+                   y=gasto_persona_diario,
+                   fill=Alojamiento_rec)) +
+  labs(x="Tipo de alojamiento",     y="Gasto diario por persona (USD corrientes)") +
+  theme(legend.position = "none")
+
+```
+
+# Construcción de una aplicación web \label{shiny}
+https://patriciamartell.shinyapps.io/ShinyApp/
+
+La aplicación Shiny permite realizar un análisis sobre la base de datos de turismo emisivo de uruguay detallada en los apartados Introducción y Problema de estudio y objetivos de este informe. En esta se presentan visualizaciones relevantes de acuerdo a las variables que se desean explorar. 
+
+La información se organiza en tres pestañas: Componentes del turismo (en la cual se despliguega un panel de selección de dos hojas: Evolución de la cantidad de salidas y Evolución del gasto en salidas), Características del turismo y Serie de tiempo. En la siguiente imagen se visualiza la pantalla inicial al ingresar a la aplicación de shiny y la organización de pestañas descrita. Además, en cada una de las pestañas de la aplicación se dispondrá de un panel de selección de filtro de las visualizaciones.
+
+![](Imagenes-shiny\imagen1.png)
+En la pestaña Componentes del turismo y apartado Evolución de la cantidad de salidas se visualiza un gráfico de lineas de los datos de turismo emisivo a partir de 2017. Este apartado cuenta con selección de periodo en el panel de selección filtros y la opción de brushedpoint sobre la gráfica lo que permite hacer una selección sobre la visualización y que se despliegue la cantidad de salidas por mes en formato tabla. En la siguiente imagen se selecciona el periodo enero 2017 a diciembre 2018 en el panel de filtros y los tres puntos más altos de dicho periodo en la gráfica, lo que despliega información de periodo y cantidad de salidas en la tabla para los puntos seleccionados.
+
+![](Imagenes-shiny\imagen2.png)
+En la pestaña Componentes del turismo y apartado Evolución del gasto en salidas se visualiza un gráfico de lineas discriminado por tipo de gasto en turismo emisivo a partir de 2017. Este apartado cuenta en el panel de selección de filtros con selección de periodo y selección por Gasto medio o Gasto diario por persona. Además, esta visualizacíón es Plotly lo que desliega una cajita de información al pasar sobre cualquier punto de la gráfica como se visualiza en la siguiente imagen.
+ 
+![](Imagenes-shiny\imagen3.png)
+
+En la pestaña Características del turismo se visualiza un diagrama de caja y una tabla con las principales estadísticas de los diagramas de caja del gasto diario por persona en turismo emisivo a partir de 2017 según una característica de turismo. Esta pestaña cuenta en el panel de selección de filtros con selección de periodo y selección de característica de turismo dentro de las cuales se encuentra: Alojamiento, Destino, Días de estadía, Integrantes por grupo, Motivo, Nivel educativo máximo y Tipo de ocupación. En otras palabras, se analiza el gasto diario por persona en base a una de estas variables del turismo.
+
+![](Imagenes-shiny\imagen4.png)
+
+
+En la pestaña Serie de tiempo se visualiza la tendencia del gasto medio desestacionalizado del turismo emisivo a partir de 2017. Esta pestaña cuenta en el panel de selección de filtros con selección de periodo. Además, esta visualizacíón es Plotly lo que desliega una cajita de información al pasar sobre cualquier punto de la gráfica como se visualiza en la siguiente imagen.
+
+![](Imagenes-shiny\imagen5.png)
+
+# Conclusiones \label{conclusiones}
+
+A lo largo de este trabajo, se exploró la última base de datos de turismo emisivo, publicada por el Ministerio de Turismo. Para un conjunto de encuestados entre diciembre de 2016 y marzo de 2020, se relevan datos vinculados al tipo de viaje realizado. Dado que se trató de una encuesta, para obtener estimaciones insesgadas resulta necesario expandir la muestra. Sin embargo, en este trabajo se optó por no utilizarlos. Por lo tanto, los resultados deben ser interpretados con cautela.
+
+El objetivo principal de este trabajo fue analizar la evolución del gasto medio diario per cápita de los turistas uruguayos. Para ello, se consideraron distintos rubros de gastos como transporte, alojamiento y compras, entre otros. Para ello, se consideró tanto el gasto en términos corrientes como constantes. Asimismo, se analizó su tendencia de largo plazo.
+
+A partir de este análisis, se sacaron varias conclusiones interesantes, entre las que se destaca:
+
+* El transporte internacional constituye el principal componente del gasto de los turistas uruguayos en el exterior. En 2017 y 2018, el gasto medio mensual por este concepto creció ininterrumpidamente. Luego de alcanzar un máximo a principios de 2019, la serie cayó hasta marzo de 2020, cuando se decretó la emergencia sanitaria.
+* La caída en el transporte internacional coincide con un crecimiento en la cantidad de viajes a Argentina. Para este destino, los costos de transporte son menores que para otras regiones. Por ende, si bien este trabajo no pretende inferir relaciones de causalidad, se plantea la hipótesis de que ambos fenómenos estén relacionados.
+* Los costos por concepto de alimentación, alojamiento, transporte local, actividades culturales tours exhiben una media aproximadamente constante a lo largo del tiempo.
+* El gasto en compras es, por lejos, el componente más volátil del gasto medio diario por persona.
+
+Además, se intentó identificar potenciales asociaciones entre el nivel de gasto y distintas variables categóricas. Los resultados más relevantes que se hallaron fueron:
+
+* La región de destino más costosa es Asia. Sin embargo, existen varios datos inusualmente altos entre quienes viajan a otras partes del mundo.
+* A mayor nivel educativo del encuestado, mayor tiende a ser el gasto total.
+* Los individuos ocupados tienden a gastar más que los desempleados y los inactivos.
+* Quienes viajan para visitar a familiares tienden a gastar menos. Esto se debe a que, con frecuencia, se evitan los costos de alojamiento.
+
+\textcolor{violet}{Hicieron un muy buen trabajo y muy buena presentación donde defienden correctamente el tema, indagan en problemáticas y ofrecen posibles respuestas. }
+
+\textcolor{violet}{El documento está muy bien ordenado,
+cumplen todos los requisitos solicitados y el AED esta encadenado, armando preguntas, ofreciendo respuestas o posibles argumentos de porque podría pasar algo. Agregan descripción detallada de la aplicación en el documento.
+La app cuenta con una descripción y es de fácil uso.
+Los datos seleccionados no son muy desafiantes, hacen solo análisis univariado y bivariado. Deberían haber explorado visualizaciones que incorporen mayores dimensiones en el análisis, basicamente usan cajas y series. 
+Puntos totales: 22/25}
+
+# Referencias \label{referencias}
+
