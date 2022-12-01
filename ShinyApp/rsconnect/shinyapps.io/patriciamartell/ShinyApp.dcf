@@ -5,9 +5,9 @@ account: patriciamartell
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 6586835
-bundleId: 6575007
+bundleId: 6575017
 url: https://patriciamartell.shinyapps.io/ShinyApp/
-when: 1669854797.7541
-lastSyncTime: 1669854797.7541
+when: 1669855140.21591
+lastSyncTime: 1669855140.21591
 asMultiple: FALSE
 asStatic: FALSE
